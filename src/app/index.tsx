@@ -1,98 +1,145 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+const { ThemedText } = require('@/components/themed-text');
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
+const STARTING_SECONDS = 2 * 60;
+
+function formatTime(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
 }
 
 export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+  const [secondsLeft, setSecondsLeft] = useState(STARTING_SECONDS);
+  const [isStopped, setIsStopped] = useState(false);
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+  useEffect(() => {
+    if (isStopped || secondsLeft === 0) {
+      return;
+    }
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+    const timer = setInterval(() => {
+      setSecondsLeft((currentSeconds) => Math.max(currentSeconds - 1, 0));
+    }, 1000);
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+    return () => clearInterval(timer);
+  }, [isStopped, secondsLeft]);
+
+  const isFinished = secondsLeft === 0;
+  const status = isFinished ? 'Tiempo cumplido' : isStopped ? 'Temporizador detenido' : 'En marcha';
+
+  return React.createElement(
+    Pressable,
+    {
+      accessibilityLabel: 'Temporizador de dos minutos',
+      accessibilityRole: 'button',
+      accessibilityState: { disabled: isStopped || isFinished },
+      disabled: isStopped || isFinished,
+      onPress: () => setIsStopped(true),
+      style: ({ pressed }: { pressed: boolean }) => [styles.container, pressed && styles.pressed],
+    },
+    React.createElement(
+      SafeAreaView,
+      { style: styles.safeArea },
+      React.createElement(
+        View,
+        { style: styles.header },
+        React.createElement(ThemedText, { style: styles.eyebrow }, 'BRUSHING TIMER'),
+        React.createElement(ThemedText, { type: 'title', style: styles.title }, 'Dos minutos para ti'),
+      ),
+      React.createElement(
+        View,
+        { style: styles.timerArea },
+        React.createElement(ThemedText, { style: styles.timer }, formatTime(secondsLeft)),
+        React.createElement(View, { style: [styles.statusDot, isStopped && styles.statusDotStopped] }),
+        React.createElement(ThemedText, { style: styles.status }, status),
+      ),
+      React.createElement(
+        View,
+        { style: styles.footer },
+        React.createElement(
+          ThemedText,
+          { style: styles.instruction },
+          isFinished ? 'Buen trabajo' : isStopped ? 'El tiempo queda guardado' : 'Toca en cualquier lugar para detener',
+        ),
+        React.createElement(ThemedText, { style: styles.duration }, '02:00 MIN'),
+      ),
+    ),
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: '#F3F0E8',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    paddingHorizontal: 28,
+    paddingTop: 20,
+    paddingBottom: 24,
+    justifyContent: 'space-between',
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+  header: {
+    gap: 12,
+  },
+  eyebrow: {
+    color: '#B65C3A',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
   },
   title: {
+    color: '#202A25',
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '600',
+  },
+  timerArea: {
+    alignItems: 'center',
+    gap: 18,
+  },
+  timer: {
+    color: '#202A25',
+    fontSize: 92,
+    lineHeight: 104,
+    fontWeight: '300',
+    letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#B65C3A',
+  },
+  statusDotStopped: {
+    backgroundColor: '#7C837C',
+  },
+  status: {
+    color: '#59635C',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  footer: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  instruction: {
+    color: '#59635C',
+    fontSize: 14,
     textAlign: 'center',
   },
-  code: {
-    textTransform: 'uppercase',
+  duration: {
+    color: '#B65C3A',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.5,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  pressed: {
+    opacity: 0.88,
   },
 });
