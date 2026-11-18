@@ -1,8 +1,25 @@
+import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  Vibration,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const STARTING_SECONDS = 2 * 60;
+
+async function triggerStrongVibration() {
+  if (Platform.OS === "android") {
+    Vibration.vibrate(500);
+    return;
+  }
+
+  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+}
 
 function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -10,12 +27,32 @@ function formatTime(seconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
+function shouldVibrate(secondsLeft: number) {
+  return (
+    (secondsLeft >= 108 && secondsLeft < 120 && secondsLeft % 4 === 0) ||
+    (secondsLeft >= 68 &&
+      secondsLeft <= 100 &&
+      (secondsLeft - 100) % 8 === 0) ||
+    (secondsLeft >= 48 && secondsLeft <= 60 && secondsLeft % 4 === 0) ||
+    (secondsLeft < 48 && secondsLeft > 0 && secondsLeft % 8 === 0)
+  );
+}
+
 export default function HomeScreen() {
   const [secondsLeft, setSecondsLeft] = useState(STARTING_SECONDS);
-  const [isStopped, setIsStopped] = useState(false);
+  const [isStopped, setIsStopped] = useState(true);
+  const [isAutoPaused, setIsAutoPaused] = useState(false);
+  const isFinished = secondsLeft === 0;
+
+  const resetTimer = () => {
+    Vibration.cancel();
+    setSecondsLeft(STARTING_SECONDS);
+    setIsStopped(true);
+    setIsAutoPaused(false);
+  };
 
   useEffect(() => {
-    if (isStopped || secondsLeft === 0) {
+    if (isStopped || isAutoPaused || isFinished) {
       return;
     }
 
@@ -24,22 +61,62 @@ export default function HomeScreen() {
     }, 1000);
 
     return () => clearInterval(timer);
+  }, [isAutoPaused, isFinished, isStopped]);
+
+  useEffect(() => {
+    if (isStopped || isAutoPaused) {
+      Vibration.cancel();
+    }
+  }, [isAutoPaused, isStopped]);
+
+  useEffect(() => {
+    if (secondsLeft !== 60 || isStopped) {
+      return;
+    }
+
+    setIsAutoPaused(true);
+    const pauseTimer = setTimeout(() => {
+      setIsAutoPaused(false);
+    }, 3000);
+
+    return () => clearTimeout(pauseTimer);
   }, [isStopped, secondsLeft]);
 
-  const isFinished = secondsLeft === 0;
+  useEffect(() => {
+    if (isStopped || isAutoPaused || secondsLeft === 0) {
+      return;
+    }
+
+    if (!shouldVibrate(secondsLeft)) {
+      return;
+    }
+
+    void triggerStrongVibration().catch((error) => {
+      console.warn("No se pudo activar la vibracion", error);
+    });
+  }, [isAutoPaused, isStopped, secondsLeft]);
+
   const status = isFinished
     ? "Tiempo cumplido"
     : isStopped
       ? "Temporizador detenido"
-      : "En marcha";
+      : isAutoPaused
+        ? "Pausa en 01:00"
+        : "En marcha";
 
   return (
     <Pressable
-      accessibilityLabel="Temporizador de dos minutos"
+      accessibilityLabel={
+        isStopped
+          ? "Reanudar temporizador de dos minutos"
+          : isAutoPaused
+            ? "Pausa automática"
+            : "Detener temporizador de dos minutos"
+      }
       accessibilityRole="button"
-      accessibilityState={{ disabled: isStopped || isFinished }}
-      disabled={isStopped || isFinished}
-      onPress={() => setIsStopped(true)}
+      accessibilityState={{ disabled: isFinished || isAutoPaused }}
+      disabled={isFinished || isAutoPaused}
+      onPress={() => setIsStopped((currentValue) => !currentValue)}
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
     >
       <SafeAreaView style={styles.safeArea}>
@@ -50,7 +127,10 @@ export default function HomeScreen() {
         <View style={styles.timerArea}>
           <Text style={styles.timer}>{formatTime(secondsLeft)}</Text>
           <View
-            style={[styles.statusDot, isStopped && styles.statusDotStopped]}
+            style={[
+              styles.statusDot,
+              (isStopped || isAutoPaused) && styles.statusDotStopped,
+            ]}
           />
           <Text style={styles.status}>{status}</Text>
         </View>
@@ -59,10 +139,25 @@ export default function HomeScreen() {
             {isFinished
               ? "Buen trabajo"
               : isStopped
-                ? "El tiempo queda guardado"
-                : "Toca en cualquier lugar para detener"}
+                ? "Toca en cualquier lugar para reanudar"
+                : isAutoPaused
+                  ? "Pausa automática de 3 segundos"
+                  : "Toca en cualquier lugar para detener"}
           </Text>
-          <Text style={styles.duration}>02:00 MIN</Text>
+          <Pressable
+            accessibilityLabel="Reiniciar contador"
+            accessibilityRole="button"
+            onPress={(event) => {
+              event.stopPropagation();
+              resetTimer();
+            }}
+            style={({ pressed }) => [
+              styles.resetButton,
+              pressed && styles.resetButtonPressed,
+            ]}
+          >
+            <Text style={styles.resetButtonText}>Reiniciar</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     </Pressable>
@@ -136,6 +231,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.5,
+  },
+  resetButton: {
+    minWidth: 112,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#B65C3A",
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  resetButtonPressed: {
+    backgroundColor: "#E8DED2",
+  },
+  resetButtonText: {
+    color: "#B65C3A",
+    fontSize: 14,
+    fontWeight: "700",
   },
   pressed: {
     opacity: 0.88,
