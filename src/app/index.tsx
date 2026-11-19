@@ -1,16 +1,33 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  Vibration,
-  View,
-} from "react-native";
+import { Platform, Pressable, StyleSheet, Vibration, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AppText from "../components/AppText";
 
-const STARTING_SECONDS = 2 * 60;
+const STARTING_SECONDS = 122;
+
+const LIGHT_THEME = {
+  background: "#c6e5e9",
+  primaryText: "#202A25",
+  timer: "#246c00",
+  secondaryText: "#3a6f44",
+  accent: "#246c00",
+  pressedBackground: "#d11111",
+};
+
+const DARK_THEME = {
+  background: "#0e0e0e",
+  primaryText: "#ffffff",
+  timer: "#60d95c",
+  secondaryText: "#A8AEA9",
+  accent: "#60d95c",
+  pressedBackground: "#2A211D",
+};
+
+function isNightTime() {
+  const hour = new Date().getHours();
+  return hour >= 20 || hour < 7;
+}
 
 async function triggerStrongVibration() {
   if (Platform.OS === "android") {
@@ -29,7 +46,7 @@ function formatTime(seconds: number) {
 
 function shouldVibrate(secondsLeft: number) {
   return (
-    (secondsLeft >= 108 && secondsLeft < 120 && secondsLeft % 4 === 0) ||
+    (secondsLeft >= 108 && secondsLeft % 4 === 0) ||
     (secondsLeft >= 68 &&
       secondsLeft <= 100 &&
       (secondsLeft - 100) % 8 === 0) ||
@@ -39,10 +56,12 @@ function shouldVibrate(secondsLeft: number) {
 }
 
 export default function HomeScreen() {
+  const [isNightMode] = useState(isNightTime);
   const [secondsLeft, setSecondsLeft] = useState(STARTING_SECONDS);
   const [isStopped, setIsStopped] = useState(true);
   const [isAutoPaused, setIsAutoPaused] = useState(false);
   const isFinished = secondsLeft === 0;
+  const theme = isNightMode ? DARK_THEME : LIGHT_THEME;
 
   const resetTimer = () => {
     Vibration.cancel();
@@ -97,53 +116,53 @@ export default function HomeScreen() {
   }, [isAutoPaused, isStopped, secondsLeft]);
 
   const status = isFinished
-    ? "Tiempo cumplido"
+    ? "Fin"
     : isStopped
-      ? "Temporizador detenido"
+      ? "Pausado"
       : isAutoPaused
         ? "Pausa en 01:00"
-        : "En marcha";
+        : "Lesgoo";
 
   return (
     <Pressable
       accessibilityLabel={
-        isStopped
-          ? "Reanudar temporizador de dos minutos"
-          : isAutoPaused
-            ? "Pausa automática"
-            : "Detener temporizador de dos minutos"
+        isStopped ? "Reanudar" : isAutoPaused ? "Pausa automática" : "Detener"
       }
       accessibilityRole="button"
       accessibilityState={{ disabled: isFinished || isAutoPaused }}
       disabled={isFinished || isAutoPaused}
       onPress={() => setIsStopped((currentValue) => !currentValue)}
-      style={({ pressed }) => [styles.container, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.container,
+        { backgroundColor: theme.background },
+        pressed && styles.pressed,
+      ]}
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <Text style={styles.eyebrow}>BRUSHING TIMER</Text>
-          <Text style={styles.title}>Dos minutos para brillar</Text>
+          <AppText style={[styles.title, { color: theme.accent }]}>
+            BRUSHING TIMER
+          </AppText>
         </View>
         <View style={styles.timerArea}>
-          <Text style={styles.timer}>{formatTime(secondsLeft)}</Text>
+          <AppText style={[styles.timer, { color: theme.timer }]}>
+            {formatTime(secondsLeft)}
+          </AppText>
           <View
             style={[
               styles.statusDot,
+              { backgroundColor: theme.accent },
               (isStopped || isAutoPaused) && styles.statusDotStopped,
             ]}
           />
-          <Text style={styles.status}>{status}</Text>
+          <AppText style={[styles.status, { color: theme.secondaryText }]}>
+            {status}
+          </AppText>
         </View>
         <View style={styles.footer}>
-          <Text style={styles.instruction}>
-            {isFinished
-              ? "Buen trabajo"
-              : isStopped
-                ? "Toca en cualquier lugar para reanudar"
-                : isAutoPaused
-                  ? "Pausa automática de 3 segundos"
-                  : "Toca en cualquier lugar para detener"}
-          </Text>
+          <AppText style={[styles.instruction, { color: theme.secondaryText }]}>
+            {isFinished ? "Buen trabajo" : " "}
+          </AppText>
           <Pressable
             accessibilityLabel="Reiniciar contador"
             accessibilityRole="button"
@@ -153,10 +172,17 @@ export default function HomeScreen() {
             }}
             style={({ pressed }) => [
               styles.resetButton,
-              pressed && styles.resetButtonPressed,
+              {
+                borderColor: theme.accent,
+              },
+              pressed && {
+                backgroundColor: theme.pressedBackground,
+              },
             ]}
           >
-            <Text style={styles.resetButtonText}>Reiniciar</Text>
+            <AppText style={[styles.resetButtonText, { color: theme.accent }]}>
+              Reiniciar
+            </AppText>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -167,7 +193,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F0E8",
   },
   safeArea: {
     flex: 1,
@@ -180,23 +205,21 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   eyebrow: {
-    color: "#B65C3A",
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 2,
   },
   title: {
-    color: "#202A25",
     fontSize: 28,
     lineHeight: 34,
     fontWeight: "600",
+    alignItems: "center",
   },
   timerArea: {
     alignItems: "center",
     gap: 18,
   },
   timer: {
-    color: "#202A25",
     fontSize: 92,
     lineHeight: 104,
     fontWeight: "300",
@@ -207,13 +230,11 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#B65C3A",
   },
   statusDotStopped: {
     backgroundColor: "#7C837C",
   },
   status: {
-    color: "#59635C",
     fontSize: 15,
     fontWeight: "500",
   },
@@ -222,12 +243,10 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   instruction: {
-    color: "#59635C",
     fontSize: 14,
     textAlign: "center",
   },
   duration: {
-    color: "#B65C3A",
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.5,
@@ -236,16 +255,11 @@ const styles = StyleSheet.create({
     minWidth: 112,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#B65C3A",
     borderRadius: 999,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
-  resetButtonPressed: {
-    backgroundColor: "#E8DED2",
-  },
   resetButtonText: {
-    color: "#B65C3A",
     fontSize: 14,
     fontWeight: "700",
   },

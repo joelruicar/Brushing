@@ -1,5 +1,24 @@
-import { Stack } from 'expo-router';
+import { useFonts } from "expo-font";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
+
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const [loaded, error] = useFonts({
+    AgravePro: require("../../assets/AgravePro.ttf"),
+  });
+
+  useEffect(() => {
+    if (loaded || error) {
+      void SplashScreen.hideAsync();
+    }
+  }, [error, loaded]);
+
+  if (!loaded && !error) {
+    return null;
+  }
+
   return <Stack screenOptions={{ headerShown: false }} />;
 }
