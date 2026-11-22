@@ -11,14 +11,16 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      void SplashScreen.hideAsync();
+    }, 1500);
+
     if (loaded || error) {
       void SplashScreen.hideAsync();
     }
-  }, [error, loaded]);
 
-  if (!loaded && !error) {
-    return null;
-  }
+    return () => clearTimeout(fallbackTimer);
+  }, [error, loaded]);
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }
